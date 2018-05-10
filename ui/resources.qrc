@@ -1,0 +1,34 @@
+<!DOCTYPE RCC><RCC version="1.0">
+<qresource>
+<file alias="addmarker.png">../icons/addmarker.png</file>
+<file alias="addmarker.svg">../icons/addmarker.svg</file>
+<file alias="back.png">../icons/back.png</file>
+<file alias="back.svg">../icons/back.svg</file>
+<file alias="clear.png">../icons/clear.png</file>
+<file alias="clear.svg">../icons/clear.svg</file>
+<file alias="forward.png">../icons/forward.png</file>
+<file alias="forward.svg">../icons/forward.svg</file>
+<file alias="home.png">../icons/home.png</file>
+<file alias="home.svg">../icons/home.svg</file>
+<file alias="markerhidden.png">../icons/markerhidden.png</file>
+<file alias="markerhidden.svg">../icons/markerhidden.svg</file>
+<file alias="markervisible.png">../icons/markervisible.png</file>
+<file alias="markervisible.svg">../icons/markervisible.svg</file>
+<file alias="removemarker.png">../icons/removemarker.png</file>
+<file alias="removemarker.svg">../icons/removemarker.svg</file>
+<file alias="roi.png">../icons/roi.png</file>
+<file alias="roi.svg">../icons/roi.svg</file>
+<file alias="roihidden.png">../icons/roihidden.png</file>
+<file alias="roihidden.svg">../icons/roihidden.svg</file>
+<file alias="roimanager.png">../icons/roimanager.png</file>
+<file alias="roimanager.svg">../icons/roimanager.svg</file>
+<file alias="roivisible.png">../icons/roivisible.png</file>
+<file alias="roivisible.svg">../icons/roivisible.svg</file>
+<file alias="save.png">../icons/save.png</file>
+<file alias="save.svg">../icons/save.svg</file>
+<file alias="select.png">../icons/select.png</file>
+<file alias="select.svg">../icons/select.svg</file>
+<file alias="zoom.png">../icons/zoom.png</file>
+<file alias="zoom.svg">../icons/zoom.svg</file>
+</qresource>
+</RCC>

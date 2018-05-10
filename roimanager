@@ -1,0 +1,703 @@
+#!/usr/bin/env python
+'''
+Data file format (hdf5)
+
++ group ['roiset']
+|   + group <roi name 1>
+|   |   + dataset ['xy']
+|   |      + attrs['colour']
+|   |
+|   + group <roi name 2>
+|       + dataset ['xy']
+|          + attrs['colour']
+|
++ group ['markers']
+    + dataset ['xy']  -> (x,y) values
+    + dataset ['c']   -> colours
+    + dataset ['m']   -> mpl markers
+
++ group ['markers']
+    + group <marker set 1>
+    |   + dataset ['xy']
+    |      + attrs['colour']
+    |      + attrs['marker']
+    |
+    + group <marker set 2>
+        + dataset ['xy']
+           + attrs['colour']
+           + attrs['marker']
+
+
+Attributes of image file
+from tif.pages[0].tags:
+    'atlas_ref'     integer, Atlas reference number     
+    'image_width'   integer
+    'image_length'  integer
+    'channels'      integer, number of channels
+    'unit'          string
+    'x_resolution'  tuple of 2 integers. Indicates pixels per unit
+                    as in e.g., if
+                    unit = micron
+                    x_resolution = (620155, 1000000)
+                    then resolution = 0.620 pixels per micron.
+    'y_resolution'  tuple of 2 integers
+
+User attr:
+
+'Image' object needs to provide at least
+image.nchannels
+image.fname
+image.shape (y, x) shape, no channels
+image.tags - dictionary
+image.tags['image_length']
+image.tags['image_width']
+
+image channels:
+    channel.yx
+    channel.cmap
+    channel.range
+'''
+    
+from __future__ import division
+from PyQt4.QtGui import (QMainWindow, QApplication, QWidget,
+        QListWidgetItem, QMessageBox, QFileDialog)
+from PyQt4.QtGui import (QRadioButton, QGridLayout)
+from PyQt4.QtCore import (QString, Qt, QVariant, QModelIndex,
+        SIGNAL, QDir)
+
+import numpy as np
+from matplotlib.widgets import Lasso
+from matplotlib import cm
+import os
+import h5py
+from ui.ui_mainwindow import Ui_MainWindow
+from rois import Roi, RoiListModel
+from ijtiff import IJTiff as Tiff
+from ijtiff import std_cmap
+
+from markers import MarkerManager
+from zoomdrag import ZoomDragManager
+
+ROINAME = 'roi'
+ROICOLOUR = 'white'
+ROIHIGHLIGHT = 'yellow'
+ROILINEWIDTH = 2
+INTERPOLATION='nearest' # nearest, bilinear, bicubic, gaussian...
+                        # Don't set it to 'none': it'll slow down imshow 
+                        # functions.
+
+# List of colourmaps. The names should correspond to either a plain
+# colour, or be the name of a matplotlib colourmap. They will be
+# arranged in that order in a left-right, top-bottom manner.
+CMAPS = ['Default', 'Gray', 'Blue', 'Hot', 'Green',
+        'Jet', 'Red', 'Spectral', 'Magenta', 'Terrain']
+
+# Default path for loading images.
+WORKINGPATH = '/home/antgon/projects/MCH-inputs/'
+
+class ChannelItem(QListWidgetItem):
+    def __init__(self, parent, chan):
+        label = 'Channel {}'.format(chan.n)
+        QListWidgetItem.__init__(self, QString(label),\
+                type=QListWidgetItem.UserType)
+        self.im = parent.ax.imshow(chan.yx, cmap=chan.cmap,
+                interpolation=INTERPOLATION)
+        self.ax = parent.ax
+        self.rng = (chan.yx.min(), chan.yx.max())
+        self.set_display_range(chan.range[0], chan.range[1])
+        self.default_cmap = chan.cmap
+        self.current_colour = 'default'
+        self.setCheckState(Qt.Unchecked)
+        self.set_visible(False)
+
+    def draw(self):
+        self.ax.figure.canvas.draw()
+
+    def set_display_range(self, rmin='auto', rmax='auto'):
+        if rmin == 'auto': rmin = self.rng[0]
+        if rmax == 'auto': rmax = self.rng[1]
+        self.im.set_clim(rmin, rmax)
+        self.draw()
+
+    def get_display_range(self):
+        return self.im.get_clim()
+
+    def set_visible(self, is_visible=True):
+        self.im.set_visible(is_visible)
+        self.is_visible = is_visible
+        self.draw()
+
+    def set_alpha(self, alpha):
+        self.im.set_alpha(alpha)
+        self.draw()
+    
+    def get_alpha(self):
+        alpha = self.im.get_alpha()
+        if alpha is None: alpha = 1
+        return alpha
+
+    def set_cmap(self, colour='default'):
+        '''
+        Set cmap from string.
+        '''
+        colour = colour.lower()
+        if colour == 'default': 
+            cmap = self.default_cmap
+        else:
+            # Try first to get the cmap from the function
+            cmap = std_cmap(colour)
+            # If that fails, get it from matpltolib
+            if cmap is None: cmap = cm.__dict__[colour]
+        self.im.set_cmap(cmap)
+        self.current_colour = colour
+        self.draw()
+
+class LassoManager:
+    def __init__(self, parent):
+        self.parent = parent
+        self.canvas = parent.canvas
+
+    def connect(self):
+        self.cid = self.canvas.mpl_connect('button_press_event',\
+                self.on_press)
+
+    def disconnect(self):
+        self.canvas.mpl_disconnect(self.cid)
+
+    def on_press(self, event):
+        if self.canvas.widgetlock.locked(): return
+        if event.inaxes is None: return
+        self.lasso = Lasso(event.inaxes, (event.xdata, event.ydata),\
+                self.callback)
+        self.lasso.line.set_color(ROICOLOUR)
+        self.lasso.line.set_linewidth(ROILINEWIDTH)
+        #self.canvas.widgetlock(self.lasso)
+
+    def callback(self, verts):
+        self.canvas.draw_idle()
+        xy = self.lasso.line.get_xydata()
+        self.parent.add_roi(xy)
+        del self.lasso
+
+class MainWindow(QMainWindow, Ui_MainWindow):
+    def __init__(self, parent=None):
+        QWidget.__init__(self, parent)
+        self.setupUi(self)
+        self._init_cmaps()
+        self._init_mpl()
+        self.rois = RoiListModel()
+        self.listRoi.setModel(self.rois)
+        self.selectedItem = None
+        self.fname = ''
+        self.attrs = {}
+        self.connect(self.rois, SIGNAL("rowInserted(QModelIndex, int)"),
+                self.on_listRoi_rowInserted)
+
+    def _init_cmaps(self):
+        '''
+        Add radio buttons for colourmaps. These are added here 
+        and not hardcoded in QtDesigner so that any colourmap 
+        set can be added by only modifying the list CMAPS.
+        All will be connected to the same slot.
+
+        CMAPS must be a list of strings with valid colourmap
+        names (as per matplotlib's cmap). Ideally one cmap in
+        the list will be 'Default'.
+
+        All colourmap names will be converted to lowercase to be
+        able to compare strings, etc. Uppercase will be used only
+        to display the names in the GUI.
+        '''
+        grid = QGridLayout()
+        cols = 2
+        for n, cmap in enumerate(CMAPS):
+            cmap = cmap.lower()
+            row = np.floor(n/cols)
+            col = n%cols
+            radio = QRadioButton(cmap.title())
+            radio.setObjectName(cmap)
+            grid.addWidget(radio, row, col)
+            self.connect(radio, SIGNAL("clicked()"),\
+                    self.on_cmap_clicked)
+            if cmap == 'default':
+                radio.setChecked(True)
+        self.groupBoxCm.setLayout(grid)
+
+    def _init_mpl(self):
+        self.ax = self.canvas.figure.add_subplot(111)
+        self.ax.axis('off')
+        self.zoom = ZoomDragManager(self.ax)
+        self.markers = MarkerManager(self)
+
+    def draw(self):
+        self.canvas.draw()
+
+    def clear(self):
+        '''
+        Reset the application. Note that the order in which the
+        following operations take place is important.
+        '''
+        # Un-check buttons.
+        for button in [\
+                self.buttonAddMarker,
+                self.buttonRemoveMarker,
+                self.buttonAddRoi,
+                self.buttonZoom,
+                self.buttonShowMarkers,
+                self.buttonShowRoi]:
+            button.setChecked(False)
+        # Clear the data models before clearing the axis
+        # or else the artists in the models won't be
+        # properly removed.
+        self.rois.clear()
+        self.markers.clear()
+        self.ax.clear()
+        self.ax.axis('off')
+        self.draw()
+        self.fname = ''
+        self.attrs = {}
+        self.lineeditAtlasRef.clear()
+        self.listChan.clear()
+        self.selectedItem = None
+
+    def on_actionOpen_triggered(self, checked=None):
+        if checked is None: return
+        # If there already is another file and data have not
+        # been saved, ask before loading new image:
+        if self.fname != '' and (self.markers.is_dirty or \
+                self.rois.is_dirty):
+            reply = QMessageBox.question(self, "", "There are unsaved "+
+                    "data.\nLoad new image anyway?",
+                    QMessageBox.No|QMessageBox.Yes)
+            if reply == QMessageBox.No: return
+        # If an image is already open, use that image's path as the
+        # working path instead of the default one.
+        if self.fname != '':  path = os.path.split(self.fname)[0]
+        else:                 path = WORKINGPATH
+        # Open-file dialog.
+        fname = QFileDialog.getOpenFileName(self,
+                caption="Select image",
+                directory=QString(path),
+                #directory=QString(WORKINGPATH),
+                filter="ImageJ files (*.tif)")
+        if len(fname) == 0: return False
+        # Open image.
+        im_opened = self.open_image(fname)
+        if im_opened:
+            # After the image has been opened, check if there
+            # is a data file.
+            fname = os.path.splitext(self.fname)[0] + '.hdf5'
+            if os.path.exists(fname):
+                # Load data if exists
+                self.load_data()
+
+    def on_actionOpenNext_triggered(self, checked=None):
+        '''
+        Closes the current image and opens the next image in the
+        current directory.
+        '''
+        if checked is None: return
+        if self.fname == '': return
+        path, fname = os.path.split(self.fname)
+        files = os.listdir(path)
+        files = [f for f in files if f.endswith('.tif')]
+        if files == []: return
+        files.sort()
+        indx = files.index(fname)
+        nextfile = files[indx+1]
+        # If there is unsaved data ask first.
+        if (self.markers.is_dirty or self.rois.is_dirty):
+            reply = QMessageBox.question(self, "", "There are unsaved "+
+                    "data.\nLoad new image anyway?",
+                    QMessageBox.No|QMessageBox.Yes)
+            if reply == QMessageBox.No: return
+        # Hide current image while loading next.
+        #for n in range(self.image.nchannels):
+            #chan = self.listChan.item(n)
+            #chan.set_visible(False)
+        #self.draw()
+        im_opened = self.open_image(os.path.join(path, nextfile))
+        if im_opened:
+            # After the image has been opened, check if there
+            # is a data file.
+            fname = os.path.splitext(self.fname)[0] + '.hdf5'
+            if os.path.exists(fname):
+                # Load data if exists
+                self.load_data()
+
+    def open_image(self, fname):
+        try:
+            image = Tiff(str(fname))
+        except (IOError, NotImplementedError) as error:
+            QMessageBox.information(self, "", "Failed to open image: {}".\
+                    format(error))
+            return False
+        # If the image was successfuly loaded, reset application.
+        self.clear()
+        # Set window title.
+        title = QString('ROI Manager  |  {}'.format(image.fname))
+        self.setWindowTitle(title)
+        # Display image.
+        self.fname = str(fname)
+        self.attrs = image.tags
+        self.imshape = image.shape
+        for chan in image:
+            item = ChannelItem(self, chan)
+            self.listChan.addItem(item)
+        # Select by default the first channel and adjust
+        # its display range.
+        ch = self.listChan.item(0)
+        self.listChan.setCurrentRow(0)
+        #ch.setSelected(True)
+        ch.setCheckState(Qt.Checked)
+        index = self.listChan.indexFromItem(ch)
+        self.on_listChan_clicked(index)
+        # Display image in full.
+        self.buttonHome.click()
+        return True
+
+    def on_actionQuit_triggered(self, checked=None):
+        if checked is None: return
+        # Confirm 'quit' if there are unsaved data.
+        if self.rois.is_dirty or self.markers.is_dirty:
+            reply = QMessageBox.question(self, "", "There are unsaved "+
+                    "data.\nQuit anyway?", QMessageBox.No|QMessageBox.Yes)
+            if reply == QMessageBox.No: return
+        # Quit if reply was 'yes' or if there was no unsaved data.
+        self.close()
+
+    def on_buttonHome_pressed(self):
+        self.ax.set_xlim(0, self.imshape[1])
+        self.ax.set_ylim(self.imshape[0], 0)
+        self.draw()
+        
+    def on_buttonZoom_toggled(self):
+        if self.buttonZoom.isChecked():
+            # Disable other buttons.
+            self.buttonAddMarker.setChecked(False)
+            self.buttonRemoveMarker.setChecked(False)
+            self.buttonAddRoi.setChecked(False)
+            # Connect.
+            self.zoom.connect()
+        else: 
+            self.zoom.disconnect()
+
+    ## Data ============================================================
+        
+    def on_buttonLoadData_released(self):
+        '''
+        Data will by default be loaded from a file named as
+        the parent image with extension hdf5.
+        '''
+        # Every data set must be associated with an image, so 
+        # make sure first that one has been opened.
+        if self.fname == '':
+            QMessageBox.information(self, "", "Open an image first")
+            return
+        # If there are unsaved changes, confirm first before
+        # overwriting data.
+        if self.rois.is_dirty or self.markers.is_dirty:
+            reply = QMessageBox.question(self, "", "There are unsaved "+
+                    "changes.\nLoad new data anyway?",
+                    QMessageBox.No|QMessageBox.Yes)
+            if reply == QMessageBox.No: return
+        self.load_data()
+
+    def load_data(self):
+        # File to load has same name as opened image but 
+        # with extension hdf5.
+        fname = os.path.splitext(self.fname)[0] + '.hdf5'
+        f = None
+        try:
+            f = h5py.File(fname, 'r')
+            self.rois.clear()
+            self.markers.clear()
+            for name in f['roiset']:
+                xy = f['roiset/'+name+'/xy']
+                colour = xy.attrs['colour']
+                self.add_roi(xy, name, colour)
+            if len(f['markers/xy']) > 0:
+                xy = f['markers/xy'][...]
+                x, y = xy.T
+                colours = f['markers/c'][...]
+                markershape = f['markers/m'][...]
+                #self.markers.add(x, y, marker=markershape, mfc=colours)
+                self.markers.add(x, y)
+            for key, val in f.attrs.iteritems():
+                self.attrs[key] = val
+            if 'atlas_ref' in f.attrs:
+                self.lineeditAtlasRef.setText(self.attrs['atlas_ref'])
+            self.draw()
+            self.statusBar.showMessage('Data loaded', 4000)
+            # After adding data to data containers 'dirty'
+            # flags will be set to True, but data has not really
+            # been edited yet.
+            self.markers.is_dirty = False
+            self.rois.is_dirty = False
+        except (IOError, OSError) as error:
+            msg = 'Failed to load file: {}'.format(error)
+            QMessageBox.information(self, "", msg)
+        finally:
+            if f is not None: f.close()
+
+    def on_buttonSaveData_released(self):
+        '''
+        Save data as hdf5 file. To make thinkg simpler, 
+        ROIs and markers are saved to an hdf5 file named as the 
+        parent image. No dialog will ask for a file name,
+        but if the file already exists, overwriting will have
+        to be confirmed.
+
+        Attributes
+        '''
+        fout = os.path.splitext(self.fname)[0] + '.hdf5'
+        # If there already is a data file, confirm before overwriting.
+        if os.path.exists(fout):
+            reply = QMessageBox.question(self, "", "File already "+
+                    "exists.\nOverwrite?".format(os.path.basename(fout)),
+                    QMessageBox.No|QMessageBox.Yes)
+            if reply == QMessageBox.No: return
+        f = None
+        try:
+            f = h5py.File(fout, 'w')
+            rgrp = f.create_group('roiset')
+            mgrp = f.create_group('markers')
+            for name, roi in self.rois._rois:
+                grp = rgrp.create_group(str(name))
+                dset = grp.create_dataset(name='xy', data=roi.get_xy())
+                dset.attrs['colour'] = roi.get_colour()
+            mgrp.create_dataset(name='xy', data=self.markers.get_xy()) 
+            mgrp.create_dataset(name='m', data=self.markers.get_markers()) 
+            mgrp.create_dataset(name='c', data=self.markers.get_colours()) 
+            for key, val in self.attrs.iteritems():
+                f.attrs[key] = val
+            self.statusBar.showMessage('Data saved', 4000)
+            self.rois.is_dirty = False
+            self.markers.is_dirty = False
+        except (OSError, IOError) as error:
+            msg = 'Failed to save file: {}'.format(error)
+            QMessageBox.information(self, "", msg)
+        finally:
+            if f is not None: f.close()
+
+
+    ## Images ==========================================================
+    '''
+    Channel list.
+
+    More than one channel can be checked, in which case all those will
+    be visible. But only one channel at the time is the 'active'
+    channel, to which display range, blending, and colourmap changes
+    will apply.
+
+    In channel list,
+        - check/unckeck will toggle visibility.
+        - highlighted channel (ie currentItem())
+    '''
+    
+    def on_listChan_clicked(self, index):
+        # chan.isSelected() reports selection
+        # chan.checkState() reports if it is ticked or 'checked'
+        # Qt.Checked vs Qt.Unchecked
+        chan = self.listChan.itemFromIndex(index)
+        if chan.checkState()==Qt.Checked and not chan.is_visible:
+            chan.set_visible(True)
+            # Select as default when activated.
+            self.listChan.setCurrentItem(chan)
+        elif chan.checkState()==Qt.Unchecked and chan.is_visible:
+            chan.set_visible(False)
+        if chan.isSelected():
+            self.sliderBlending.setValue(chan.get_alpha()*20)
+            rmin, rmax = chan.get_display_range()
+            for slider in (self.sliderMin, self.sliderMax):
+                slider.setMinimum(chan.rng[0])
+                slider.setMaximum(chan.rng[1])
+                self.sliderMin.setValue(rmin)
+                self.sliderMax.setValue(rmax)
+            # Match the current colour in displayed with that selected
+            # in the colourmap box.
+            radio = self.groupBoxCm.findChild(QRadioButton,\
+                    QString(chan.current_colour))
+            radio.setChecked(True)
+        self.draw()
+
+    def on_sliderMin_sliderReleased(self):
+        '''
+        Adjust min intensity of displayed channel.
+        '''
+        chan = self.listChan.currentItem()
+        if chan is None: return
+        rmin, rmax = chan.get_display_range()
+        rmin = self.sliderMin.value()
+        chan.set_display_range(rmin, rmax)
+
+    def on_sliderMax_sliderReleased(self):
+        '''
+        Adjust max intensity of displayed channel.
+        '''
+        #chan = self.listChan.selectedItems()
+        chan = self.listChan.currentItem()
+        if chan is None: return
+        rmin, rmax = chan.get_display_range()
+        rmax = self.sliderMax.value()
+        chan.set_display_range(rmin, rmax)
+
+    def on_cmap_clicked(self):
+        if self.fname == '': return
+        button = self.sender()
+        if button is None or not isinstance(button, QRadioButton):
+            return
+        cmap = str(button.text())
+        chan = self.listChan.currentItem()
+        chan.set_cmap(cmap)
+
+    def on_lineeditAtlasRef_editingFinished(self):
+        self.attrs['atlas_ref'] = str(self.lineeditAtlasRef.text())
+
+    def on_sliderBlending_sliderReleased(self):
+        '''
+        This slider is for setting image's alpha value. Alpha values
+        are in the range 0-1, but the slider properties can only be set
+        at integer increments. Thus, the slider range was set 0-20 at
+        single step of one so that actual alpha blending value equals
+        slider.value() divided by 20 (and steps will thus be in 1/20 =
+        0.05 increments).
+        '''
+        chan = self.listChan.currentItem()
+        if chan is None: return
+        alpha = self.sliderBlending.value()/20 
+        chan.set_alpha(alpha)
+        self.draw()
+
+    ## ROIs ============================================================
+
+    def add_roi(self, xy, name=ROINAME, colour=ROICOLOUR):
+        roi = Roi(xy, name, colour)
+        roi = self.rois.insertRow(roi)
+        roi.polygon.set_lw(ROILINEWIDTH)
+        self.ax.add_artist(roi.polygon)
+        self.draw()
+
+    def on_buttonAddRoi_toggled(self):
+        '''
+        Add ROI.
+        '''
+        if self.buttonAddRoi.isChecked(): 
+            # Every ROI set must be associated with an image. Do not
+            # allow to draw a ROI unless an image has been loaded first.
+            if self.fname == '':
+                QMessageBox.information(self, "", "Open an image first")
+                self.buttonRoiAdd.setChecked(False)
+                return
+            # Disable all other editing buttons.
+            if self.buttonAddMarker.isChecked():
+                self.buttonAddMarker.setChecked(False)
+            if self.buttonRemoveMarker.isChecked():
+                self.buttonRemoveMarker.setChecked(False)
+            if self.buttonZoom.isChecked():
+                self.buttonZoom.setChecked(False)
+            # Enable lasso.
+            self.lasso = LassoManager(self)
+            self.lasso.connect()
+        elif self.fname != '':
+            self.lasso.disconnect()
+
+    def on_listRoi_rowInserted(self, index, position):
+        self.listRoi.setCurrentIndex(index)
+        self.highlight_current(position)
+
+    def on_buttonRemoveRoi_released(self):
+        index = self.listRoi.currentIndex()
+        if not index.isValid(): return
+        self.rois.removeRow(index.row())
+        self.draw()
+        self.selectedItem = None
+        self.rois.reset()
+
+    def on_listRoi_clicked(self, index):
+        '''
+        Highlight clicked ROI.
+        '''
+        # Disable marker editing.
+        self.buttonAddMarker.setChecked(False)
+        self.buttonRemoveMarker.setChecked(False)
+        self.highlight_current(index.row())
+
+    def on_listRoi_selectionChanged(self, a, b):
+        print(a, b)
+
+    def highlight_current(self, row):
+        # If an item has been selected previously,
+        # restore its colour to the default.
+        if self.selectedItem is not None:
+            roi = self.rois._rois[self.selectedItem][1]
+            roi.set_colour(ROICOLOUR)
+        # Highlight current item.
+        self.selectedItem = row
+        #try:
+        roi = self.rois._rois[self.selectedItem][1]
+        roi.set_colour(ROIHIGHLIGHT)
+        self.draw()
+        #except IndexError:
+        #    return
+
+    def on_buttonShowRoi_toggled(self):
+        if self.buttonShowRoi.isChecked():
+            self.rois.set_visible(False)
+        else:
+            self.rois.set_visible(True)
+        self.draw()
+
+    ## Markers =========================================================
+    
+    def on_buttonShowMarkers_toggled(self):
+        if self.buttonShowMarkers.isChecked():
+            [line.set_visible(False) for line in self.ax.lines]
+            self.draw()
+        else:
+            [line.set_visible(True) for line in self.ax.lines]
+            self.draw()
+
+    def on_buttonAddMarker_toggled(self):
+        if self.buttonAddMarker.isChecked():
+            # Disable all other buttons.
+            self.buttonRemoveMarker.setChecked(False)
+            self.buttonZoom.setChecked(False)
+            self.buttonAddRoi.setChecked(False)
+            # Connect.
+            self.markers.connect_add()
+        else:
+            self.markers.disconnect()
+
+    def on_buttonRemoveMarker_toggled(self):
+        if self.buttonRemoveMarker.isChecked():
+            # Disable all other buttons.
+            self.buttonAddMarker.setChecked(False)
+            self.buttonZoom.setChecked(False)
+            self.buttonAddRoi.setChecked(False)
+            # Connect.
+            self.markers.connect_remove()
+        else:
+            self.markers.disconnect()
+
+if __name__ == '__main__':
+    import sys, os
+    app = QApplication(sys.argv)
+    myapp = MainWindow()
+    myapp.show()
+    
+    self = myapp
+    self.open_image('demodata/219-0418.tif')
+    self.load_data()
+    a = os.path.splitext(self.fname)[0] + '.hdf5'
+    f = h5py.File(a, 'r')
+    xy = f['markers/xy'][...]
+    x, y = xy.T
+    c = f['markers/c'][...]
+    m = f['markers/m'][...]
+
+    [self.ax.plot([X], [Y], col) for X, Y, col in zip(x, y, c)]
+    
+    
+
+    #app.exec_()

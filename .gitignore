@@ -1,0 +1,10 @@
+__pycache__
+*.pyc
+*.swp
+*.bk
+*.so
+
+todo
+demodata
+icons/*.png
+ui/__pycache__
