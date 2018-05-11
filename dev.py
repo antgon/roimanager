@@ -2,7 +2,7 @@
 Sort cells into ROIs
 '''
 
-from __future__ import division
+
 import numpy as np
 import pandas as pd
 import h5py
@@ -24,18 +24,18 @@ def from_file(fname):
             colour = xy.attrs['colour']
             rois[name] = xy[...]
         markers = f['markers/xy'][...]
-        for key, val in f.attrs.iteritems():
+        for key, val in f.attrs.items():
             attrs[key] = val
         return markers, rois, attrs
     except IOError as error:
-        print 'File {}: {}'.format(fname, error)
+        print('File {}: {}'.format(fname, error))
         return
     finally:
         if f is not None: f.close()
 
 def markers_per_struct(markers, rois, ontology):
     sorted_mrk = pd.DataFrame(index=np.arange(len(markers)))
-    for name, xy in rois.iteritems():
+    for name, xy in rois.items():
         sorted_mrk[name] = points_inside_poly(markers, xy)
     # If a marker is not assigned to at least one ROI, raise a warning.
     assert np.all(sorted_mrk.sum(axis=1) > 0),\
@@ -51,8 +51,8 @@ def markers_per_struct(markers, rois, ontology):
         iswrong = np.ones(sorted_mrk.columns.size, bool)
         iswrong[indices] = False
         iswrong = sorted_mrk.columns.values[iswrong]
-        raise ValueError, 'Non-existent acronym(s) {} in file {}'\
-                .format(iswrong, fname)
+        raise ValueError('Non-existent acronym(s) {} in file {}'\
+                .format(iswrong, fname))
     # Some markers may fall inside more than one structure. In those
     # cases the sum per row (i.e. sum of True values per marker) will
     # be more than one: sorted_mrk[sorted_mrk.sum(1) > 1]. We must
@@ -63,14 +63,14 @@ def markers_per_struct(markers, rois, ontology):
         # Use only the True values in the series.
         ser = ser[ser]
         # Create a list of structures that all contain the same marker.
-        isin = [ontology[key] for key in ser.keys()]
+        isin = [ontology[key] for key in list(ser.keys())]
         # 'None' will be returned from ontology if the key is not in it,
         # ie if the acronym does not exist in the ontology database (as
         # would happen when typing wrong capitalisation, not naming roi,
         # etc).
         if None in isin:
-            raise ValueError, 'Non-existent acronym {} in file {}'.\
-                    format(ser.index.values, fname)
+            raise ValueError('Non-existent acronym {} in file {}'.\
+                    format(ser.index.values, fname))
         # I have not decided how to deal with cases where the marker falls
         # inside more that 2 structures.
         assert len(isin) == 2, "One marker in more than one structure {}".format(isin)
@@ -112,8 +112,8 @@ for fname in files:
     try:
         t = markers_per_struct(markers, rois, ontology)
         tot = pd.concat([tot, t])
-    except AssertionError, error:
-        print 'Error in file {}: {}'.format(fname, error)
+    except AssertionError as error:
+        print('Error in file {}: {}'.format(fname, error))
 tot = tot.sum(axis=0, skipna=True)
 # To add results from several dataframes when indices differ,
 # concatenate these *before* totalling cell counts, ie

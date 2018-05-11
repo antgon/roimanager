@@ -7,7 +7,7 @@ cell number per region, put all together into one data frame,
 then save.
 '''
 
-from __future__ import division
+
 import numpy as np
 import pandas as pd
 import h5py
@@ -56,10 +56,10 @@ class DataFile:
                 xy = h5file['roiset/'+roiName+'/xy']
                 self.rois[roiName] = xy[...]
             self.markers = h5file['markers/xy'][...]
-            for key, val in h5file.attrs.iteritems():
+            for key, val in h5file.attrs.items():
                 self.__dict__[key] = val
         except IOError as error:
-            print 'File {}: {}'.format(fname, error)
+            print('File {}: {}'.format(fname, error))
         finally:
             if h5file is not None: h5file.close()
         self.nrois = len(self.rois)
@@ -78,7 +78,7 @@ class DataFile:
         #cmap = plt.cm.Set3
         ncolours = self.nrois
         colours = [cmap(i) for i in np.linspace(0, 0.9, ncolours)]
-        for (i, roi) in enumerate(self.rois.itervalues()):
+        for (i, roi) in enumerate(self.rois.values()):
             x, y = roi.T
             plt.plot(x, y, c=colours[i])
         x, y = self.markers.T
@@ -88,16 +88,15 @@ class DataFile:
     def get_markers_per_structure(self):
         ontology = Ontology()
         sorted_markers = pd.DataFrame(index=np.arange(self.nmarkers))
-        for roi_name, roi_xy in self.rois.iteritems():
+        for roi_name, roi_xy in self.rois.items():
             sorted_markers[roi_name] = points_inside_poly(\
                     self.markers, roi_xy)
 
         # Raise an error if a marker is not assigned to at least one
         # ROI.
         if not np.all(sorted_markers.sum(axis=1) > 0):
-            raise ValueError,\
-                    "There are markers with no ROI assigned ({})".\
-                    format(os.path.split(self.fname)[-1])
+            raise ValueError("There are markers with no ROI assigned ({})".\
+                    format(os.path.split(self.fname)[-1]))
 
         # Remove from analysis those structures without markers.
         sorted_markers = sorted_markers[\
@@ -111,9 +110,8 @@ class DataFile:
             iswrong = np.ones(sorted_markers.columns.size, bool)
             iswrong[indices] = False
             iswrong = sorted_markers.columns.values[iswrong]
-            raise ValueError,\
-                    'Non-existent acronym(s) {} in file {}'\
-                    .format(iswrong, self.fname)
+            raise ValueError('Non-existent acronym(s) {} in file {}'\
+                    .format(iswrong, self.fname))
 
         # Some markers may fall inside more than one structure. In
         # those cases the sum per row (i.e. sum of True values per
@@ -128,15 +126,14 @@ class DataFile:
             ser = ser[ser]
             # Create a list of structures that all contain the same
             # marker.
-            isin = [ontology[key] for key in ser.keys()]
+            isin = [ontology[key] for key in list(ser.keys())]
             # 'None' will be returned from ontology if the key is not
             # in it, ie if the acronym does not exist in the ontology
             # database (as would happen when typing wrong
             # capitalisation, not naming roi, etc).
             if None in isin:
-                raise ValueError,\
-                        'Non-existent acronym {} in file {}'.\
-                        format(ser.index.values, self.fname)
+                raise ValueError('Non-existent acronym {} in file {}'.\
+                        format(ser.index.values, self.fname))
             # I have not decided how to deal with cases where the
             # marker falls inside more that 2 structures.
             assert len(isin) == 2,\

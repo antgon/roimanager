@@ -158,8 +158,8 @@ class IJTiff(object):
                 self.__dict__['chan%i'%(n+1)] =\
                         Channel(n+1, yx, cmaps[n], ranges[n])
         else:
-            raise NotImplementedError, "Images with more than" +\
-                    "3 dimensions are not supported."
+            raise NotImplementedError("Images with more than" +\
+                    "3 dimensions are not supported.")
 
         # A 'tags' dictionary will hold relevant data.
         self.tags = {
@@ -172,7 +172,7 @@ class IJTiff(object):
                 }
 
     def __iter__(self):
-        keys = self.__dict__.keys()
+        keys = list(self.__dict__.keys())
         keys.sort()
         for key in keys:
             if key.startswith('chan'):

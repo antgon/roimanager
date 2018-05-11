@@ -58,7 +58,7 @@ image channels:
     channel.range
 '''
     
-from __future__ import division
+
 from PyQt4.QtGui import (QMainWindow, QApplication, QWidget,
         QListWidgetItem, QMessageBox, QFileDialog)
 from PyQt4.QtGui import (QRadioButton, QGridLayout)
@@ -423,7 +423,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 markershape = f['markers/m'][...]
                 #self.markers.add(x, y, marker=markershape, mfc=colours)
                 self.markers.add(x, y)
-            for key, val in f.attrs.iteritems():
+            for key, val in f.attrs.items():
                 self.attrs[key] = val
             if 'atlas_ref' in f.attrs:
                 self.lineeditAtlasRef.setText(self.attrs['atlas_ref'])
@@ -469,7 +469,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             mgrp.create_dataset(name='xy', data=self.markers.get_xy()) 
             mgrp.create_dataset(name='m', data=self.markers.get_markers()) 
             mgrp.create_dataset(name='c', data=self.markers.get_colours()) 
-            for key, val in self.attrs.iteritems():
+            for key, val in self.attrs.items():
                 f.attrs[key] = val
             self.statusBar.showMessage('Data saved', 4000)
             self.rois.is_dirty = False
@@ -624,7 +624,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.highlight_current(index.row())
 
     def on_listRoi_selectionChanged(self, a, b):
-        print(a, b)
+        print((a, b))
 
     def highlight_current(self, row):
         # If an item has been selected previously,
