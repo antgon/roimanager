@@ -2,30 +2,32 @@ import numpy as np
 from tifffile import TiffFile
 from matplotlib.colors import LinearSegmentedColormap, ListedColormap
 
+
 def std_cmap(colour):
     '''
     Standard LUTs in fluorescence microscopy use just one colour and
     set the background in black.
     '''
     if colour in ['green', 'g']:
-        return LinearSegmentedColormap.from_list('green',\
-                ['black', 'green'])
+        return LinearSegmentedColormap.from_list(
+                'green', ['black', 'green'])
     elif colour in ['blue', 'b']:
-        return LinearSegmentedColormap.from_list('blue',\
-                ['black', 'blue'])
+        return LinearSegmentedColormap.from_list(
+                'blue', ['black', 'blue'])
     elif colour in ['red', 'r']:
-        return LinearSegmentedColormap.from_list('red',\
-                ['black', 'red'])
+        return LinearSegmentedColormap.from_list(
+                'red', ['black', 'red'])
     elif colour in ['magenta', 'm']:
-        return LinearSegmentedColormap.from_list('magenta',\
-                ['black', 'magenta'])
+        return LinearSegmentedColormap.from_list(
+                'magenta', ['black', 'magenta'])
     elif colour in ['cyan', 'c']:
-        return LinearSegmentedColormap.from_list('cyan',\
-                ['black', 'cyan'])
+        return LinearSegmentedColormap.from_list(
+                'cyan', ['black', 'cyan'])
     else:
         # If no colour is defined here, returning None will set the
         # default colormap in imshow.
         return None
+
 
 def lut_to_cmap(lut):
     '''
@@ -103,7 +105,7 @@ class IJTiff(object):
         # 'axes' defines the data arrangement in the image array, e.g.
         # 'ZCYX' for mutliple-stacks, mulitple-channels images,
         # 'CYX' for multiple-channels, single stack images, etc.
-        axes = tif.series[0]['axes']
+        axes = tif.series[0].axes
 
         # Images with z-stacks are not yet supported.
         if 'Z' in axes:
@@ -113,34 +115,32 @@ class IJTiff(object):
         # of channels is stored elsewhere.
         x_indx = axes.find('X')
         y_indx = axes.find('Y')
-        shape = tif.series[0]['shape']
+        shape = tif.series[0].shape
         self.shape = (shape[y_indx], shape[x_indx])
 
         # Read tags and extract relevant information.
         self.fname = tif.filename
         self.fpath = tif.filehandle.path
-        tags = tif.pages[0].tags
-        ijtags = tif.pages[0].imagej_tags
-        self.nchannels = ijtags['channels']
+        self.nchannels = tif.imagej_metadata['channels']
         # If the image contains its own luts, use them. (Is this the
         # case with all images where 'mode' is 'composite'?)
-        if 'luts'in ijtags:
-            luts = ijtags['luts']
+        if 'luts'in tif.imagej_metadata:
+            luts = tif.imagej_metadata['luts']
             cmaps = [lut_to_cmap(lut) for lut in luts]
         # If there are no luts, use a standard colours for each
-        # channel. (Is this the case with all images ijtags['mode'] ==
-        # 'color'?)
+        # channel. (Is this the case with all images
+        # tif.imagej_metadata['mode'] == 'color'?)
         else:
             colours = ('b', 'g', 'r', 'm', 'c')[:self.nchannels]
             cmaps = [std_cmap(colour) for colour in colours]
-        ranges = ijtags['ranges']
+        ranges = tif.imagej_metadata['Ranges']
         ranges = np.array(ranges).reshape(self.nchannels, -1)
 
         # Read image data.
         im = tif.asarray()
         # Single-channel images.
         if im.ndim == 2:
-            self.__dict__['chan1'] = Channel(1, yx, cmaps, ranges)
+            self.__dict__['chan1'] = Channel(1, im, cmaps, ranges)
         # Multi-channel images.
         elif im.ndim == 3:
             for n in range(self.nchannels):
@@ -151,26 +151,28 @@ class IJTiff(object):
                 # equivalent to channel), where all channels are
                 # contained in the same tiff page and the page's
                 # 'samples_per_pixel' is > 1.
-                if   axes == 'YXS': yx = im[:, :, n]
-                elif axes == 'CYX': yx = im[n, :, :]
+                if axes == 'YXS':
+                    yx = im[:, :, n]
+                elif axes == 'CYX':
+                    yx = im[n, :, :]
                 # Create the channel. A unit is added to the channel
                 # number's name to keep in line with the way channels
                 # are displayed/named in ImageJ (i.e first channel is
                 # number one, not 0.
-                self.__dict__['chan%i'%(n+1)] =\
-                        Channel(n+1, yx, cmaps[n], ranges[n])
+                self.__dict__['chan%i' % (n+1)] = Channel(
+                        n+1, yx, cmaps[n], ranges[n])
         else:
-            raise NotImplementedError("Images with more than" +\
-                    "3 dimensions are not supported.")
+            raise NotImplementedError("Images with more than " +
+                                      "3 dimensions are not supported.")
 
         # A 'tags' dictionary will hold relevant data.
         self.tags = {
-                'image_name'  : tif.filename,
-                'image_width' : tags['image_width'].value,
-                'image_length': tags['image_length'].value,
-                'unit'        : ijtags['unit'],
-                'x_resolution': tags['x_resolution'].value,
-                'y_resolution': tags['y_resolution'].value
+                'image_name': tif.filename,
+                'image_width': tif.pages[0].imagewidth,
+                'image_length': tif.pages[0].imagelength,
+                'unit': tif.imagej_metadata['unit']
+                # 'x_resolution': tags['x_resolution'].value,
+                # 'y_resolution': tags['y_resolution'].value
                 }
 
     def __iter__(self):
@@ -179,6 +181,7 @@ class IJTiff(object):
         for key in keys:
             if key.startswith('chan'):
                 yield self.__dict__[key]
+
 
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
