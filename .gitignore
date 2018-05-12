@@ -8,3 +8,5 @@ todo
 demodata
 icons/*.png
 ui/__pycache__
+.ropeproject
+setup_tifffile.py

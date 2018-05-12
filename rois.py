@@ -1,7 +1,7 @@
-from PyQt4.QtCore import (QString, Qt, QVariant, QModelIndex, SIGNAL)
-from PyQt4.QtCore import (QAbstractListModel)
-import h5py
-import bisect
+from PyQt5.QtCore import (Qt, QVariant, QModelIndex)
+from PyQt5.QtCore import (QAbstractListModel)
+# import h5py
+# import bisect
 from matplotlib.patches import Polygon
 
 class Roi(object):
@@ -98,7 +98,7 @@ class RoiListModel(QAbstractListModel):
             roi_item[0] = name
             # Rename roi object.
             roi_item[1].set_name(name)
-            # If ROIs are sorted, then that item has now to be 
+            # If ROIs are sorted, then that item has now to be
             # the one selcted/highlighted.
             #self._rois = sorted(self._rois)
             #newrow = bisect.bisect_left(self._rois, [name])
@@ -120,7 +120,7 @@ class RoiListModel(QAbstractListModel):
     def get_unique_name(self, name):
         '''
         Ensure that a ROI name is unique.
-        
+
         If 'name' is already in use by a ROI, an underscore
         and a number are appended to that name to make it
         unique.
@@ -164,8 +164,8 @@ class RoiListModel(QAbstractListModel):
         self._rois.insert(position, [name, roi])
         self.endInsertRows()
         index = self.index(position)
-        self.emit(SIGNAL("rowInserted(QModelIndex, int)"),
-                index, position)
+        # self.emit(SIGNAL("rowInserted(QModelIndex, int)"),
+                # index, position) TODO
         # Set flag.
         self.is_dirty = True
         #return True
@@ -174,4 +174,3 @@ class RoiListModel(QAbstractListModel):
     def set_visible(self, b):
         if len(self._rois) > 0:
             [r[1].polygon.set_visible(b) for r in self._rois]
-

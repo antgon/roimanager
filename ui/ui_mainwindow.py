@@ -374,5 +374,5 @@ class Ui_MainWindow(object):
         self.actionOpenNext.setText(_translate("MainWindow", "Open next"))
         self.actionOpenNext.setShortcut(_translate("MainWindow", "Ctrl+N"))
 
-from mplcanvas import MplCanvas
+from .mplcanvas import MplCanvas
 from . import resources_rc

@@ -5,7 +5,7 @@ from matplotlib.colors import LinearSegmentedColormap, ListedColormap
 def std_cmap(colour):
     '''
     Standard LUTs in fluorescence microscopy use just one colour and
-    set the background in black. 
+    set the background in black.
     '''
     if colour in ['green', 'g']:
         return LinearSegmentedColormap.from_list('green',\
@@ -50,6 +50,7 @@ def lut_to_cmap(lut):
     # Return as a matplotlib colormap.
     return ListedColormap(rgb)
 
+
 class Channel:
     def __init__(self, n, yx, cmap, rnge):
         self.yx = yx
@@ -58,13 +59,14 @@ class Channel:
         self.range = rnge
         self.n = n
 
+
 class IJTiff(object):
     '''
     -----------
     ImageJ tiff
     -----------
 
-    Reads tiff images created with ImageJ. LUTs are read from 
+    Reads tiff images created with ImageJ. LUTs are read from
     the file's tiff tags and converted into Matplotlib's
     colormaps.
 
@@ -89,7 +91,7 @@ class IJTiff(object):
        'lut_to_cm'.
 
     2) Read LUTs from the tiff tags and convert them into mpl
-       colormaps. This is achieved with 
+       colormaps. This is achieved with
        matplotlib.colors.ListedColormap, see function 'std_cm' above.
 
     '''
@@ -102,7 +104,7 @@ class IJTiff(object):
         # 'ZCYX' for mutliple-stacks, mulitple-channels images,
         # 'CYX' for multiple-channels, single stack images, etc.
         axes = tif.series[0]['axes']
-        
+
         # Images with z-stacks are not yet supported.
         if 'Z' in axes:
             raise NotImplementedError("Z-stacks are not supported")
@@ -182,14 +184,14 @@ if __name__ == '__main__':
     import matplotlib.pyplot as plt
 
     # File of type 'CYX'. Will have one page for each channel.
-    #fname = '/home/antgon/Data/A219/epifluorescence/tif/219-0206.tif'
-    fname = '/home/antgon/projects/MCH-inputs/MCH-cre/A29/tif/' + \
-            '29-0607.tif'
+    fname = 'demodata/219-0418.tif'
+    # fname = '/home/antgon/projects/MCH-inputs/MCH-cre/A29/tif/' + \
+            # '29-0607.tif'
 
     # File of type 'YXS'. All channels will go into one single
     # page.
     #fname = '/home/antgon/Data/A219/epifluorescence/tif/219-0618.tif'
-    
+
     # A confocal image: 2 channels with 3 z-levels each. 'Series' is
     # of type 'ZCYX'.
     #fname = '/home/antgon/Data/A231/tiffs/231-0206-001.tif'
