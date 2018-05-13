@@ -170,9 +170,9 @@ class IJTiff(object):
                 'image_name': tif.filename,
                 'image_width': tif.pages[0].imagewidth,
                 'image_length': tif.pages[0].imagelength,
-                'unit': tif.imagej_metadata['unit']
-                # 'x_resolution': tags['x_resolution'].value,
-                # 'y_resolution': tags['y_resolution'].value
+                'unit': tif.imagej_metadata['unit'],
+                'x_resolution': tif.pages[0].tags['XResolution'].value,
+                'y_resolution': tif.pages[0].tags['YResolution'].value
                 }
 
     def __iter__(self):
