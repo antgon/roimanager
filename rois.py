@@ -101,12 +101,6 @@ class RoiListModel(QAbstractListModel):
             roi_item[0] = name
             # Rename roi object.
             roi_item[1].set_name(name)
-            # If ROIs are sorted, then that item has now to be
-            # the one selcted/highlighted.
-            # self._rois = sorted(self._rois)
-            # newrow = bisect.bisect_left(self._rois, [name])
-            # self.emit(SIGNAL("dataChanged(QModelIndex, QModelIndex)"),
-                    # index, self.index(newrow))
             self.is_dirty = True
             return True
         return False
@@ -150,13 +144,13 @@ class RoiListModel(QAbstractListModel):
         roi.set_name(name)
         # Add roi to list.
         position = self.rowCount()
-        # position = bisect.bisect_left(self._rois, [name, roi])
         self.beginInsertRows(QModelIndex(), position, position)
         self._rois.insert(position, [name, roi])
         self.endInsertRows()
+        # TODO: Are these lines necessary in PyQt5?
         # index = self.index(position)
         # self.emit(SIGNAL("rowInserted(QModelIndex, int)"),
-                  # index, position) TODO
+        #          # index, position)
         # Set flag.
         self.is_dirty = True
         # return True

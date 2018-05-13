@@ -201,8 +201,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.fname = ''
         self.attrs = {}
         self.rois.rowsInserted.connect(self.on_listRoi_rowInserted)
-        # self.connect(self.rois, SIGNAL("rowInserted(QModelIndex, int)"),
-                # self.on_listRoi_rowInserted)
 
     def _init_cmaps(self):
         '''
@@ -229,8 +227,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             radio.setObjectName(cmap)
             grid.addWidget(radio, row, col)
             radio.clicked.connect(self.on_cmap_clicked)
-            #self.connect(radio, SIGNAL("clicked()"),
-                         # self.on_cmap_clicked)
             if cmap == 'default':
                 radio.setChecked(True)
         self.groupBoxCm.setLayout(grid)
@@ -279,8 +275,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if self.fname != '' and (self.markers.is_dirty or
                                  self.rois.is_dirty):
             msg = "There are unsaved data.\nLoad new image anyway?"
-            reply = QMessageBox.question(self, "", msg,
-                                         QMessageBox.No|QMessageBox.Yes)
+            reply = QMessageBox.question(
+                    self, "", msg, QMessageBox.No | QMessageBox.Yes)
             if reply == QMessageBox.No:
                 return
         # If an image is already open, use that image's path as the
@@ -732,17 +728,6 @@ if __name__ == '__main__':
     app = QApplication(sys.argv)
     myapp = MainWindow()
     myapp.show()
-
-    self = myapp
-    self.open_image('demodata/219-0418.tif')
-
-    #a = os.path.splitext(self.fname)[0] + '.hdf5'
-    #f = h5py.File(a, 'r')
-    #xy = f['markers/xy'][...]
-    #x, y = xy.T
-    #c = f['markers/c'][...]
-    #m = f['markers/m'][...]
-
-    #[self.ax.plot([X], [Y], col) for X, Y, col in zip(x, y, c)]
-
-    #app.exec_()
+    # self = myapp
+    # self.open_image('demodata/219-0418.tif')
+    app.exec_()
