@@ -59,7 +59,7 @@ class MarkerManager(object):
         self.ax.plot([x], [y], marker=marker, mec=mec, mfc=mfc,
                 picker=picker, ms=ms, mew=mew)
         self.is_dirty = True
-        
+
     def connect_remove(self):
         self.disconnect()
         self.cid = self.canvas.mpl_connect('pick_event', self.on_remove)
@@ -81,10 +81,16 @@ class MarkerManager(object):
 
     def get_markers(self):
         markers = [l.get_marker() for l in self.ax.lines]
+        # h5py requires ascii, not Unicode. Converting to an array of
+        # type "S" avoids TypeErrors in h5py.
+        markers = np.array(markers, dtype="S")
         return markers
 
     def get_colours(self):
         colours = [l.get_mfc() for l in self.ax.lines]
+        # h5py requires ascii, not Unicode. Converting to an array of
+        # type "S" avoids TypeErrors in h5py.
+        colours = np.array(colours, dtype="S")
         return colours
 
     def get_labels(self):
