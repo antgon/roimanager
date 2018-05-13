@@ -69,6 +69,7 @@ import numpy as np
 from matplotlib.widgets import Lasso
 from matplotlib import cm
 import os
+import re
 import h5py
 from ui.ui_mainwindow import Ui_MainWindow
 from rois import Roi, RoiListModel
@@ -292,9 +293,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         fname = QFileDialog.getOpenFileName(
                 self, caption="Select image",
                 directory=path,
-                #  directory=QString(WORKINGPATH),
                 filter="ImageJ files (*.tif)")
-        if len(fname) == 0:
+        # getOpenFilename returns a tuple with filename and filter. Keep
+        # only filename.
+        fname = fname[0]
+        # If the user cancelled the dialog there will be no filename.
+        if not fname:
             return False
         # Open image.
         im_opened = self.open_image(fname)
@@ -424,6 +428,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     self, "", msg, QMessageBox.No | QMessageBox.Yes)
             if reply == QMessageBox.No:
                 return
+        self.selectedItem = None
         self.load_data()
 
     def load_data(self):
@@ -449,7 +454,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             for key, val in list(f.attrs.items()):
                 self.attrs[key] = val
             if 'atlas_ref' in f.attrs:
-                self.lineeditAtlasRef.setText(self.attrs['atlas_ref'])
+                txt = self.attrs['atlas_ref']
+                self.lineeditAtlasRef.setText(str(txt))
             self.draw()
             self.statusBar.showMessage('Data loaded', 4000)
             # After adding data to data containers 'dirty'
@@ -457,8 +463,18 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             # been edited yet.
             self.markers.is_dirty = False
             self.rois.is_dirty = False
-        except (IOError, OSError) as error:
-            msg = 'Failed to load file: {}'.format(error)
+        except OSError as error:
+            args = error.args[0]
+            # Use regular expression to extract useful information
+            # from the original error message.
+            error_msg = re.search("error message = \'(.+?)\'", args)
+            error_msg = error_msg.group(1)
+            name = re.search("name = \'(.+?)\'", args)
+            name = name.group(1)
+            msg = 'Failed to load {}:\n{}.'.format(name, error_msg)
+            QMessageBox.information(self, "", msg)
+        except IOError as error:
+            msg = 'Failed to load file: {}'.format(error.args[0])
             QMessageBox.information(self, "", msg)
         finally:
             if f is not None:
@@ -466,7 +482,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def on_buttonSaveData_released(self):
         '''
-        Save data as hdf5 file. To make thinkg simpler,
+        Save data as hdf5 file. To make things simpler,
         ROIs and markers are saved to an hdf5 file named as the
         parent image. No dialog will ask for a file name,
         but if the file already exists, overwriting will have
@@ -494,7 +510,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 dset.attrs['colour'] = roi.get_colour()
             mgrp.create_dataset(name='xy', data=self.markers.get_xy())
             mgrp.create_dataset(
-                    name='m', data=self.markers.get_markers())
+                    name='m', data=np.array(self.markers.get_markers()))
             mgrp.create_dataset(
                     name='c', data=self.markers.get_colours())
             for key, val in list(self.attrs.items()):
@@ -508,7 +524,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         finally:
             if f is not None:
                 f.close()
-
 
     # Images ===========================================================
     '''
@@ -646,7 +661,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.rois.removeRow(index.row())
         self.draw()
         self.selectedItem = None
-        self.rois.reset()
+        # self.rois.reset() # is this necessary??
 
     def on_listRoi_clicked(self, index):
         '''
@@ -661,19 +676,16 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         print((a, b))
 
     def highlight_current(self, row):
-        # If an item has been selected previously,
-        # restore its colour to the default.
+        # If an item had been selected previously restore its colour to
+        # the default (no highlight) before highlighting 'row'.
         if self.selectedItem is not None:
             roi = self.rois._rois[self.selectedItem][1]
             roi.set_colour(ROICOLOUR)
-        # Highlight current item.
         self.selectedItem = row
-        # try:
+        # Highlight current item.
         roi = self.rois._rois[self.selectedItem][1]
         roi.set_colour(ROIHIGHLIGHT)
         self.draw()
-        # except IndexError:
-        #    return
 
     def on_buttonShowRoi_toggled(self):
         if self.buttonShowRoi.isChecked():
@@ -723,14 +735,14 @@ if __name__ == '__main__':
 
     self = myapp
     self.open_image('demodata/219-0418.tif')
-    self.load_data()
-    a = os.path.splitext(self.fname)[0] + '.hdf5'
-    f = h5py.File(a, 'r')
-    xy = f['markers/xy'][...]
-    x, y = xy.T
-    c = f['markers/c'][...]
-    m = f['markers/m'][...]
 
-    [self.ax.plot([X], [Y], col) for X, Y, col in zip(x, y, c)]
+    #a = os.path.splitext(self.fname)[0] + '.hdf5'
+    #f = h5py.File(a, 'r')
+    #xy = f['markers/xy'][...]
+    #x, y = xy.T
+    #c = f['markers/c'][...]
+    #m = f['markers/m'][...]
 
-    # app.exec_()
+    #[self.ax.plot([X], [Y], col) for X, Y, col in zip(x, y, c)]
+
+    #app.exec_()
