@@ -4,6 +4,7 @@ from PyQt5.QtCore import (QAbstractListModel)
 # import bisect
 from matplotlib.patches import Polygon
 
+
 class Roi(object):
     def __init__(self, xy, name, colour, linewidth=None):
         '''
@@ -46,6 +47,7 @@ class Roi(object):
     def get_polygon(self):
         return self.polygon
 
+
 class RoiListModel(QAbstractListModel):
     def __init__(self):
         super(RoiListModel, self).__init__()
@@ -63,7 +65,7 @@ class RoiListModel(QAbstractListModel):
             roi[1].polygon.remove()
         self._rois = []
         self.is_dirty = False
-        #self.listRoi.clearSelection()
+        # self.listRoi.clearSelection()
 
     def rowCount(self, index=QModelIndex):
         return len(self._rois)
@@ -73,7 +75,7 @@ class RoiListModel(QAbstractListModel):
                 not (0 <= index.row() < len(self._rois)):
                     return QVariant()
         name = self._rois[index.row()][0]
-        if role==Qt.DisplayRole:
+        if role == Qt.DisplayRole:
             return QVariant(name)
         return QVariant()
 
@@ -85,14 +87,15 @@ class RoiListModel(QAbstractListModel):
         if not index.isValid():
             return Qt.ItemIsEnabled
         return Qt.ItemFlags(QAbstractListModel.flags(self, index) |
-                Qt.ItemIsEditable)
+                            Qt.ItemIsEditable)
 
     def setData(self, index, value, role=Qt.EditRole):
         if index.isValid() and 0 <= index.row() < len(self._rois):
             # Do not allow blank names.
-            if len(value.toString()) == 0: return False
+            if len(value) == 0:
+                return False
             # Make sure new name is unique.
-            name = self.get_unique_name(value.toString())
+            name = self.get_unique_name(value)
             roi_item = self._rois[index.row()]
             # Change name in ROI collection.
             roi_item[0] = name
@@ -100,16 +103,17 @@ class RoiListModel(QAbstractListModel):
             roi_item[1].set_name(name)
             # If ROIs are sorted, then that item has now to be
             # the one selcted/highlighted.
-            #self._rois = sorted(self._rois)
-            #newrow = bisect.bisect_left(self._rois, [name])
-            #self.emit(SIGNAL("dataChanged(QModelIndex, QModelIndex)"),
-                    #index, self.index(newrow))
+            # self._rois = sorted(self._rois)
+            # newrow = bisect.bisect_left(self._rois, [name])
+            # self.emit(SIGNAL("dataChanged(QModelIndex, QModelIndex)"),
+                    # index, self.index(newrow))
             self.is_dirty = True
             return True
         return False
 
     def removeRow(self, position, index=QModelIndex()):
-        if len(self._rois) == 0: return False
+        if len(self._rois) == 0:
+            return False
         self.beginRemoveRows(QModelIndex(), position, position)
         roi = self._rois.pop(position)
         roi[1].polygon.remove()
@@ -129,7 +133,8 @@ class RoiListModel(QAbstractListModel):
         names = [roi[0] for roi in self._rois]
         # If 'name' does not already exist return that name
         # and exit.
-        if name not in names: return name
+        if name not in names:
+            return name
         # If it does exist, iterate until we create one which
         # does not exist.
         newname = name
@@ -139,36 +144,22 @@ class RoiListModel(QAbstractListModel):
             n += 1
         return newname
 
-    #def insertRows(self, position, row=1, index=QModelIndex()):
-        #self.beginInsertRows(index, position, position+row-1)
-        #self.endInsertRows()
-        #self.emit(SIGNAL("rowsInserted(QModelIndex, int, int)"),\
-                #index, position, position+row-1)
-        #return True
-
-    #def insertRow(self, position, index=QModelIndex()):
-        #self.beginInsertRows(index, position, position)
-        #self.endInsertRows()
-        #self.emit(SIGNAL("rowInserted(QModelIndex, int)"),\
-                #index, position)
-        #return True
-
     def insertRow(self, roi):
         # New roi name should be unique.
         name = self.get_unique_name(roi.name)
         roi.set_name(name)
         # Add roi to list.
         position = self.rowCount()
-        #position = bisect.bisect_left(self._rois, [name, roi])
+        # position = bisect.bisect_left(self._rois, [name, roi])
         self.beginInsertRows(QModelIndex(), position, position)
         self._rois.insert(position, [name, roi])
         self.endInsertRows()
-        index = self.index(position)
+        # index = self.index(position)
         # self.emit(SIGNAL("rowInserted(QModelIndex, int)"),
-                # index, position) TODO
+                  # index, position) TODO
         # Set flag.
         self.is_dirty = True
-        #return True
+        # return True
         return roi
 
     def set_visible(self, b):
