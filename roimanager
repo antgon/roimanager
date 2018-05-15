@@ -1,81 +1,38 @@
-#!/usr/bin/env python3
-'''
-Data file format (hdf5)
+#! /usr/bin/env python3
+# coding=utf-8
+#
+# Copyright (c) 2015-2018 Antonio González
+#
+# This file is part of roimanager.
+#
+# Roimanager is free software: you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by the
+# Free Software Foundation, either version 3 of the License, or (at your
+# option) any later version.
+#
+# Roimanager is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with roimanager. If not, see <http://www.gnu.org/licenses/>.
 
-+ group ['roiset']
-|   + group <roi name 1>
-|   |   + dataset ['xy']
-|   |      + attrs['colour']
-|   |
-|   + group <roi name 2>
-|       + dataset ['xy']
-|          + attrs['colour']
-|
-+ group ['markers']
-    + dataset ['xy']  -> (x,y) values
-    + dataset ['c']   -> colours
-    + dataset ['m']   -> mpl markers
-
-+ group ['markers']
-    + group <marker set 1>
-    |   + dataset ['xy']
-    |      + attrs['colour']
-    |      + attrs['marker']
-    |
-    + group <marker set 2>
-        + dataset ['xy']
-           + attrs['colour']
-           + attrs['marker']
-
-
-Attributes of image file
-from tif.pages[0].tags:
-    'atlas_ref'     integer, Atlas reference number
-    'image_width'   integer
-    'image_length'  integer
-    'channels'      integer, number of channels
-    'unit'          string
-    'x_resolution'  tuple of 2 integers. Indicates pixels per unit
-                    as in e.g., if
-                    unit = micron
-                    x_resolution = (620155, 1000000)
-                    then resolution = 0.620 pixels per micron.
-    'y_resolution'  tuple of 2 integers
-
-User attr:
-
-'Image' object needs to provide at least
-image.nchannels
-image.fname
-image.shape (y, x) shape, no channels
-image.tags - dictionary
-image.tags['image_length']
-image.tags['image_width']
-
-image channels:
-    channel.yx
-    channel.cmap
-    channel.range
-'''
-
-
+import os
+import re
+import h5py
+import numpy as np
 from PyQt5.QtWidgets import (QMainWindow, QApplication, QWidget,
                              QListWidgetItem, QMessageBox, QFileDialog,
                              QRadioButton, QGridLayout)
 from PyQt5.QtCore import Qt
-# from PyQt5.QtCore import (QVariant, QModelIndex, QDir)
-
-import numpy as np
 from matplotlib.widgets import Lasso
 from matplotlib import cm
-import os
-import re
-import h5py
+
 from ui.ui_mainwindow import Ui_MainWindow
 from rois import Roi, RoiListModel
 from ijtiff import IJTiff as Tiff
 from ijtiff import std_cmap
-
 from markers import MarkerManager
 from zoomdrag import ZoomDragManager
 

@@ -4,7 +4,7 @@ __pycache__
 *.bk
 *.so
 
-todo
+TODO
 demodata
 icons/*.png
 ui/__pycache__

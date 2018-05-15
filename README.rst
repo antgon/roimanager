@@ -14,9 +14,9 @@ The package was originally developed to count projections neurones in
 sections of mouse brain, and sort those cells into anatomical regions;
 see:
 
-González et al (2016). Awake dynamics and brain-wide direct inputs of
-hypothalamic MCH and orexin networks. Nature Communications 7:11395.
-DOI: 10.1038/ncomms11395
+González *et al* (2016). Awake dynamics and brain-wide direct inputs of
+hypothalamic MCH and orexin networks. *Nature Communications* 7:11395
+(DOI: 10.1038/ncomms11395).
 
 (C) 2015-2018 [Antonio González](mailto:antgon@cantab.net)
 
