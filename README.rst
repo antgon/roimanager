@@ -3,14 +3,16 @@
 roimanager
 ==========
 
-Facilitates delimiting and naming regions of interest (ROIs) and
-counting cells in micrographs from brain tissue.
+Facilitates counting cells in micrographs from brain tissue and sorting
+them into different anatomical regions of interest (ROIs).
 
 This package displays an imageJ tiff image and provides tools to
 navigate the image, draw and name ROIs, and mark cells. The ROIs and
-markers are saved into individual hdf5 files for future analyses.
+markers are saved into individual hdf5 files. At a later stage these
+files can be read and the counted cells are sorted into their respective
+ROIs.
 
-The package was originally developed to count projections neurones in
+The package was originally developed to count projection neurones in
 sections of mouse brain, and sort those cells into anatomical regions;
 see:
 
