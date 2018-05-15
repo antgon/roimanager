@@ -279,7 +279,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             return
         files.sort()
         indx = files.index(fname)
-        nextfile = files[indx+1]
+        try:
+            nextfile = files[indx+1]
+        except IndexError:
+            QMessageBox.information(
+                    self, "", "No more files available.")
+            return False
+
         # If there is unsaved data ask first.
         if (self.markers.is_dirty or self.rois.is_dirty):
             msg = "There are unsaved data.\nLoad new image anyway?"
