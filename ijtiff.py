@@ -201,28 +201,3 @@ class IJTiff(object):
         for key in keys:
             if key.startswith('chan'):
                 yield self.__dict__[key]
-
-
-if __name__ == '__main__':
-    import matplotlib.pyplot as plt
-
-    # File of type 'CYX'. Will have one page for each channel.
-    fname = 'demodata/219-0418.tif'
-    # fname = '/home/antgon/projects/MCH-inputs/MCH-cre/A29/tif/' + \
-            # '29-0607.tif'
-
-    # File of type 'YXS'. All channels will go into one single
-    # page.
-    #fname = '/home/antgon/Data/A219/epifluorescence/tif/219-0618.tif'
-
-    # A confocal image: 2 channels with 3 z-levels each. 'Series' is
-    # of type 'ZCYX'.
-    #fname = '/home/antgon/Data/A231/tiffs/231-0206-001.tif'
-
-    tif = IJTiff(fname)
-    ch = tif.chan2
-    ax = plt.figure().add_subplot(111)
-    im = ax.imshow(ch.yx, cmap=ch.cmap)
-    im.set_clim(ch.range)
-    ax.set_axis_off()
-    plt.show()

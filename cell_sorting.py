@@ -154,7 +154,7 @@ class RoiFile:
         # Raise an error if a marker is not assigned to at least one
         # ROI.
         if not np.all(sorted_markers.sum(axis=1) > 0):
-            msg = "There are markers with no ROI assigned ({})".format(
+            msg = "There are markers with no ROI ({})".format(
                     os.path.split(self.fname)[-1])
             raise ValueError(msg)
 
@@ -171,8 +171,9 @@ class RoiFile:
             iswrong = np.ones(sorted_markers.columns.size, bool)
             iswrong[indices] = False
             iswrong = sorted_markers.columns.values[iswrong]
-            msg = 'Non-existent acronym(s) {} in file {}'.format(
-                    iswrong, self.fname)
+            msg = '{}: invalid acronym(s) {}'.format(
+                        self.fname, iswrong)
+            self.ISW = iswrong
             raise ValueError(msg)
 
         # Some markers may fall inside more than one structure. In
@@ -196,8 +197,8 @@ class RoiFile:
             # database (as would happen when typing wrong
             # capitalisation, not naming roi, etc).
             if None in isin:
-                msg = 'Non-existent acronym {} in file {}'.format(
-                        ser.index.values, self.fname)
+                msg = 'File {}: {} is not a valid acronym'.format(
+                        self.fname, ser.index.values)
                 raise ValueError(msg)
 
             # I have not decided how to deal with cases where the
@@ -210,9 +211,10 @@ class RoiFile:
             # depth in the ontology tree, so we expect the last
             # structure in the list to be within the first one.
             isin.sort()
-            msg = 'Structure {} is not part of structure {}'.format(
-                    isin[-1], isin[0])
-            assert isin[-1] in isin[0], msg
+            if isin[-1] not in isin[0]:
+                msg = 'Structure {} is not part of structure {}'.format(
+                        isin[-1], isin[0])
+                raise ValueError(msg)
 
             # If the above assumptions are true (ie that, compared to
             # the first structure, the second structure in the list is
@@ -231,8 +233,8 @@ class RoiFile:
 
 
 if __name__ == '__main__':
-    # fname = "demodata/20-0224.hdf5"
-    fname = 'demodata/22-0618.hdf5'
+    fname = "demodata/219-0418.hdf5"
+    # fname = 'demodata/22-0618.hdf5'
     f = RoiFile(fname)
     f.plot()
     print(f.get_markers_per_structure())
